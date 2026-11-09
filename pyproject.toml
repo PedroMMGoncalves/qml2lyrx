@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "qml2lyrx"
-version = "0.1.0"
+version = "0.1.1"
 description = "Convert QGIS layer styles (.qml) into ArcGIS Pro layer files (.lyrx) and styles (.stylx)"
 readme = "README.md"
 requires-python = ">=3.9"

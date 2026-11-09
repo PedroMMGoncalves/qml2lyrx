@@ -1,16 +1,16 @@
 #!/usr/bin/env python3
-"""Converte um estilo QML do QGIS num layer file (.lyrx) do ArcGIS Pro.
+"""Convert a QGIS layer style (.qml) into an ArcGIS Pro layer file (.lyrx).
 
-Um .qml é XML, um .lyrx é JSON. O programa faz três coisas:
+A .qml is XML, a .lyrx is JSON. The program does three things:
 
-    ler o QML   ->  [(valor, rótulo, cor), ...]   (a lista de classes)
-    traduzir    ->  o mesmo, no molde JSON que o Pro espera
-    escrever    ->  o .lyrx
+    read the QML  ->  [(value, label, colour), ...]   (the list of classes)
+    translate     ->  the same list, in the JSON template Pro expects
+    write         ->  the .lyrx
 
-Tudo o resto é o molde fixo da função `camada` — copiado de um .lyrx escrito
-pelo próprio Pro, porque o Pro exige aquelas chaves todas.
+Everything else is the fixed template in `camada()` — copied from a .lyrx
+written by Pro itself, because Pro insists on all those keys.
 
-    python qml2lyrx.py estilo.qml saida.lyrx --source dados.gpkg --dataset camada
+    python qml2lyrx.py style.qml out.lyrx --source data.gpkg --dataset layer
 """
 import argparse
 import configparser
@@ -25,15 +25,20 @@ import zipfile
 from datetime import date
 from pathlib import Path
 
-# o CIM mede espessuras em pontos; o QGIS em mm/pixel/polegada
+# CIM measures widths in points; QGIS in mm / pixel / inch
 UNIDADES = {"MM": 2.834645669, "Pixel": 0.75, "Point": 1.0, "Inch": 72.0}
 
-VERSAO = "0.1.0"
+VERSAO = "0.1.1"
 
 
-# ------------------------------------------------------------------- ler
+def _n(count, word, suffix="s"):
+    """'1 class' / '2 classes' — keeps the console messages readable."""
+    return f"{count} {word}{'' if count == 1 else suffix}"
+
+
+# ------------------------------------------------------------------- read
 def cor(texto, alpha=1.0):
-    """'230,0,77,255' -> (230, 0, 77, 100). O alfa do CIM vai de 0 a 100."""
+    """'230,0,77,255' -> (230, 0, 77, 100). CIM alpha runs from 0 to 100."""
     if not texto:
         return None
     r, g, b, a = [float(x) for x in (texto.split(",") + ["255"])[:4]]
@@ -45,7 +50,7 @@ def pontos(valor, unidade):
 
 
 def simbolo(elem):
-    """<symbol> do QML -> {'geometria', 'cor', 'contorno', 'espessura'}."""
+    """<symbol> of the QML -> {'geometria', 'cor', 'contorno', 'espessura'}."""
     alpha = float(elem.get("alpha", 1))
     for camada in elem.findall("layer"):
         op = {o.get("name"): o.get("value") for o in camada.iter("Option") if o.get("name")}
@@ -58,18 +63,18 @@ def simbolo(elem):
                     "contorno": contorno, "espessura": espessura}
         if camada.get("class") == "SimpleLine":
             if (op.get("line_style") or "solid") not in ("solid", "no"):
-                print("aviso: linha tracejada desenhada contínua", file=sys.stderr)
+                print("warning: dashed line drawn as solid", file=sys.stderr)
             return {"geometria": "line", "cor": cor(op.get("line_color"), alpha),
                     "contorno": None,
                     "espessura": pontos(op.get("line_width"), op.get("line_width_unit"))}
-    raise SystemExit(f"símbolo não suportado: {elem.get('type')} (só SimpleFill e SimpleLine)")
+    raise SystemExit(f"unsupported symbol: {elem.get('type')} (only SimpleFill and SimpleLine)")
 
 
 def ler_qml(origem):
-    """Abre o QML e devolve (campo, [{'valor', 'rotulo', 'simbolo'}, ...]).
+    """Open the QML and return (field, [{'valor', 'rotulo', 'simbolo'}, ...]).
 
-    `origem` é um ficheiro .qml, ou 'dados.gpkg#NomeDoEstilo' para os estilos que
-    o QGIS guarda dentro do próprio GeoPackage (tabela layer_styles).
+    `origem` is a .qml file, or 'data.gpkg#StyleName' for the styles QGIS keeps
+    inside the GeoPackage itself (the layer_styles table).
     """
     if "#" in str(origem):
         ficheiro, nome = str(origem).rsplit("#", 1)
@@ -79,17 +84,17 @@ def ler_qml(origem):
 
     renderer = raiz.find("renderer-v2")
     if renderer is None:
-        raise SystemExit(f"{origem}: não é um estilo de camada (falta <renderer-v2>)")
+        raise SystemExit(f"{origem}: not a layer style (no <renderer-v2>)")
 
     simbolos = {s.get("name"): simbolo(s) for s in renderer.findall("./symbols/symbol")}
     tipo = renderer.get("type")
 
     if tipo == "singleSymbol":
         chave = renderer.get("symbol")
-        if chave not in simbolos:  # o QGIS 3.34 não escreve o atributo `symbol`
+        if chave not in simbolos:  # QGIS 3.34 does not write the `symbol` attribute
             chave = next(iter(simbolos), None)
         if chave is None:
-            raise SystemExit(f"{origem}: renderer sem símbolos")
+            raise SystemExit(f"{origem}: renderer without symbols")
         return None, [{"valor": None, "rotulo": "", "simbolo": simbolos[chave]}]
 
     if tipo == "categorizedSymbol":
@@ -108,27 +113,27 @@ def ler_qml(origem):
                 continue
             achado = re.match(r'^\s*"?(\w+)"?\s*=\s*(.+?)\s*$', filtro)
             if not achado:
-                raise SystemExit(f"filtro não suportado: {filtro}")
+                raise SystemExit(f"unsupported filter: {filtro}")
             campo = campo or achado.group(1)
             valor = achado.group(2).strip("'\"")
             if valor in vistos:
-                print(f"aviso: valor {valor} repetido; fica a primeira regra", file=sys.stderr)
+                print(f"warning: duplicate value {valor}; the first rule wins", file=sys.stderr)
                 continue
             vistos.add(valor)
             classes.append({"valor": valor, "rotulo": regra.get("label") or valor,
                             "simbolo": simbolos[regra.get("symbol")]})
         return campo, classes
 
-    raise SystemExit(f"renderer '{tipo}' não suportado (singleSymbol, categorizedSymbol, RuleRenderer)")
+    raise SystemExit(f"renderer '{tipo}' is not supported (singleSymbol, categorizedSymbol, RuleRenderer)")
 
 
-# --------------------------------------------------------------- escrever
+# ---------------------------------------------------------------- write
 def rgbs(c):
     return {"type": "CIMRGBColor", "values": list(c)}
 
 
 def traco(c, espessura):
-    """Um contorno/linha. Sem cor -> não há traço."""
+    """One outline / line. No colour means no stroke."""
     return {"type": "CIMSolidStroke", "enable": True, "capStyle": "Round",
             "joinStyle": "Round", "lineStyle3D": "Strip", "miterLimit": 10,
             "width": round(espessura or 0.1, 2), "color": rgbs(c)}
@@ -148,24 +153,24 @@ def referencia(s):
 
 
 def renderer(campo, classes):
-    """Símbolo único se não há campo; senão unique values, uma classe por valor."""
+    """Single symbol when there is no field; otherwise unique values, one class per value."""
     if campo is None:
         return {"type": "CIMSimpleRenderer", "sampleSize": 10000, "patch": "Default",
                 "symbol": referencia(classes[0]["simbolo"])}
 
-    # símbolo cinzento que o Pro guarda para "outros valores" (não é desenhado)
+    # grey symbol Pro keeps for "all other values" (it is not drawn)
     cinzento = {"geometria": "polygon", "cor": (130, 130, 130, 100),
                 "contorno": (110, 110, 110, 100), "espessura": 0.7}
 
     r = {
         "type": "CIMUniqueValueRenderer",
         "sampleSize": 10000,
-        # o Pro guarda sempre uma rampa no renderer; as cores das classes são explícitas
+        # Pro always keeps a colour ramp on the renderer; class colours are explicit
         "colorRamp": {"type": "CIMRandomHSVColorRamp",
                       "colorSpace": {"type": "CIMICCColorSpace", "url": "Default RGB"},
                       "maxH": 360, "minS": 15, "maxS": 30, "minV": 99, "maxV": 100,
                       "minAlpha": 100, "maxAlpha": 100},
-        "defaultLabel": "Outros valores",
+        "defaultLabel": "Other values",
         "defaultSymbol": referencia(cinzento),
         "defaultSymbolPatch": "Default",
         "useDefaultSymbol": False,
@@ -190,7 +195,7 @@ def renderer(campo, classes):
 
 
 def camada(nome, campo, rend, ligacao):
-    """O molde de uma camada. Isto é cópia de um .lyrx do Pro, não é lógica."""
+    """The layer template. This is copied from a Pro .lyrx; it is not logic."""
     return {
         "type": "CIMFeatureLayer",
         "name": nome,
@@ -277,19 +282,19 @@ def documento(nome, campo, rend, ligacao):
 
 
 def ligacao(source, dataset):
-    """Onde estão os dados. Sem --source fica uma ligação de exemplo."""
+    """Where the data lives. Without --source a placeholder connection is written."""
     if not source:
-        return {"DATABASE": r"DATABASE=C:\dados\exemplo.gdb", "factory": "FileGDB",
-                "dataset": dataset or "capa"}
+        return {"DATABASE": r"DATABASE=C:\data\example.gdb", "factory": "FileGDB",
+                "dataset": dataset or "layer"}
     p = Path(source)
-    # uma pasta é, por convenção, uma pasta de shapefiles
+    # a folder is, by convention, a shapefile folder
     factory = "Shapefile" if p.is_dir() else {".gdb": "FileGDB"}.get(p.suffix.lower(), "GPKG")
     return {"DATABASE": f"DATABASE={p}", "factory": factory,
             "dataset": dataset or p.stem}
 
 
 def estilo_do_gpkg(caminho, nome):
-    """Vai buscar o QML que o QGIS guardou na tabela layer_styles do GeoPackage."""
+    """Fetch the QML that QGIS stored in the GeoPackage layer_styles table."""
     con = None
     try:
         con = sqlite3.connect(f"file:{Path(caminho).as_posix()}?mode=ro", uri=True)
@@ -297,20 +302,20 @@ def estilo_do_gpkg(caminho, nome):
             "select styleQML from layer_styles where styleName = ?", (nome,)
         ).fetchone()
     except sqlite3.DatabaseError as exc:
-        raise SystemExit(f"{caminho}: não consigo ler os estilos ({exc})")
+        raise SystemExit(f"{caminho}: cannot read the styles ({exc})")
     finally:
         if con is not None:
             con.close()
     if not linha:
-        raise SystemExit(f"{caminho}: não encontrei o estilo '{nome}' em layer_styles")
+        raise SystemExit(f"{caminho}: no style named '{nome}' in layer_styles")
     return linha[0]
 
 
 def estilos_do_gpkg(caminho):
-    """[(estilo, tabela), ...] guardados no GeoPackage; [] se não houver nenhum.
+    """[(style, table), ...] stored in the GeoPackage; [] when there are none.
 
-    Um ficheiro com extensão .gpkg que não seja uma base de dados (um .zip
-    renomeado, por exemplo) devolve [] em vez de rebentar.
+    A file with a .gpkg extension that is not a database (a renamed .zip, for
+    instance) returns [] instead of crashing.
     """
     con = None
     try:
@@ -323,10 +328,9 @@ def estilos_do_gpkg(caminho):
             con.close()
 
 
-# ---------------------------------------------------------------- estilo
-# O .stylx é uma base de dados SQLite. Estas definições foram copiadas de um
-# .stylx instalado pelo ArcGIS Pro (app6b.stylx): o conteúdo dos símbolos é CIM
-# em JSON, na tabela ITEMS.
+# ----------------------------------------------------------------- style
+# A .stylx is a SQLite database. These definitions were copied from a .stylx
+# installed by ArcGIS Pro (app6b.stylx): symbol content is CIM JSON, in ITEMS.
 _CLASSES = [
     (1, "Color"), (2, "Color Scheme"), (3, "Point Symbol"), (4, "Line Symbol"),
     (5, "Polygon Symbol"), (6, "Text Symbol"), (7, "North Arrow"),
@@ -366,7 +370,7 @@ _META = [
 
 
 def gravar_stylx(destino, classes, categoria):
-    """Escreve o .stylx a partir das classes já lidas do QML."""
+    """Write the .stylx from classes already read from the QML."""
     destino = Path(destino)
     destino.parent.mkdir(parents=True, exist_ok=True)
     destino.unlink(missing_ok=True)
@@ -383,7 +387,7 @@ def gravar_stylx(destino, classes, categoria):
                 "insert into ITEMS (CLASS, CATEGORY, NAME, TAGS, CONTENT, KEY) "
                 "values (?, ?, ?, ?, ?, ?)",
                 (
-                    5 if poligono else 4,          # 5=Polygon Symbol, 4=Line Symbol
+                    5 if poligono else 4,          # 5 = Polygon Symbol, 4 = Line Symbol
                     categoria,
                     classe["rotulo"],
                     f"{categoria};{classe['valor'] or numero}",
@@ -395,21 +399,21 @@ def gravar_stylx(destino, classes, categoria):
     finally:
         con.close()
 
-    print(f"  estilo: {len(classes)} símbolos -> {destino}")
+    print(f"  style: {_n(len(classes), 'symbol')} -> {destino}")
     return len(classes)
 
 
 def escrever_stylx(origem, destino, categoria=None):
-    """Lê um estilo e escreve só o .stylx (modo linha de comando)."""
+    """Read a style and write only the .stylx (command-line mode)."""
     campo, classes = ler_qml(origem)
     return gravar_stylx(destino, classes, categoria or Path(destino).stem)
 
 
 def converter(origem, saida, dados=None, camada=None, nome=None, campo=None):
-    """Converte uma coisa só e escreve o .lyrx.
+    """Convert one style and write the .lyrx.
 
-    `campo` serve para quando o campo no destino tem outro nome — é o caso das
-    shapefiles, que cortam os nomes aos 10 caracteres (cos25v1_n4_c -> cos25v1_n4).
+    `campo` handles destinations whose field name differs — shapefiles truncate
+    names to 10 characters (cos25v1_n4_c -> cos25v1_n4).
     """
     campo_qml, classes = ler_qml(origem)
     campo = campo or campo_qml
@@ -418,13 +422,13 @@ def converter(origem, saida, dados=None, camada=None, nome=None, campo=None):
     Path(saida).parent.mkdir(parents=True, exist_ok=True)
     Path(saida).write_text(json.dumps(doc, indent=2, ensure_ascii=False) + "\n",
                            encoding="utf-8")
-    print(f"{origem}: {len(classes)} classes sobre '{campo or '—'}' -> {saida}")
+    print(f"{origem}: {_n(len(classes), 'class', 'es')} on '{campo or '—'}' -> {saida}")
 
-    # a cada .lyrx sai também o .stylx com os mesmos símbolos
+    # every .lyrx also gets the .stylx with the same symbols
     gravar_stylx(Path(saida).with_suffix(".stylx"), classes,
                  nome or Path(saida).stem)
 
-    # variante para shapefiles: o DBF corta os nomes dos campos aos 10 caracteres
+    # shapefile variant: the DBF truncates field names to 10 characters
     if campo and len(campo) > 10:
         curto = campo[:10]
         gemeo = Path(saida).with_name(Path(saida).stem + "_shapefile.lyrx")
@@ -432,81 +436,81 @@ def converter(origem, saida, dados=None, camada=None, nome=None, campo=None):
                               renderer(curto, classes), ligacao(dados, camada))
         gemeo.write_text(json.dumps(doc_curto, indent=2, ensure_ascii=False) + "\n",
                          encoding="utf-8")
-        print(f"  shapefile: campo '{curto}' -> {gemeo}")
+        print(f"  shapefile: field '{curto}' -> {gemeo}")
 
 
 def lote(config):
-    """Corre as conversões de um ficheiro .ini (uma secção por camada).
+    """Run the conversions listed in an .ini file (one section per layer).
 
-        [COS25v1_N4]                    <- nome da camada no ArcGIS Pro
-        estilo = dados.gpkg#COS25v1_n4  <- .qml, ou 'gpkg#Estilo'
-        dados  = dados.gpkg             <- opcional: por omissão, o do estilo
-        camada = cos2025v1              <- tabela que o Pro vai abrir
-        saida  = saida/COS25v1_N4.lyrx  <- opcional: por omissão, <secção>.lyrx
+        [COS25v1_N4]                     <- layer name in ArcGIS Pro
+        style  = data.gpkg#COS25v1_n4    <- .qml, or 'gpkg#StyleName'
+        data   = data.gpkg               <- optional: defaults to the style's gpkg
+        layer  = cos2025v1               <- table Pro will open
+        output = out/COS25v1_N4.lyrx     <- optional: defaults to <section>.lyrx
     """
     base = Path(config).parent
     cfg = configparser.ConfigParser()
     try:
         if not cfg.read(config, encoding="utf-8"):
-            raise SystemExit(f"não consigo ler {config}")
+            raise SystemExit(f"cannot read {config}")
     except configparser.Error as exc:
         raise SystemExit(f"{config}: {exc}")
 
     ok = falhas = 0
     for nome in cfg.sections():
         secao = cfg[nome]
-        estilo = secao.get("estilo", "").strip()
-        if not estilo:
-            print(f"{config} [{nome}]: falta 'estilo ='", file=sys.stderr)
+        style = secao.get("style", "").strip()
+        if not style:
+            print(f"{config} [{nome}]: missing 'style ='", file=sys.stderr)
             falhas += 1
             continue
 
-        dados = secao.get("dados", "").strip() or None
-        camada = secao.get("camada", "").strip() or None
-        saida = secao.get("saida", "").strip() or f"{nome}.lyrx"
+        data = secao.get("data", "").strip() or None
+        layer = secao.get("layer", "").strip() or None
+        output = secao.get("output", "").strip() or f"{nome}.lyrx"
 
-        if "#" in estilo:
-            ficheiro, nome_estilo = estilo.rsplit("#", 1)
+        if "#" in style:
+            ficheiro, nome_estilo = style.rsplit("#", 1)
             origem = f"{base / ficheiro}#{nome_estilo}"
-            dados = dados or str(base / ficheiro)
+            data = data or str(base / ficheiro)
         else:
-            origem = str(base / estilo)
+            origem = str(base / style)
 
         try:
-            converter(origem, (base / saida).resolve(),
-                      str((base / dados).resolve()) if dados else None, camada, nome)
+            converter(origem, (base / output).resolve(),
+                      str((base / data).resolve()) if data else None, layer, nome)
             ok += 1
         except SystemExit as exc:
             print(f"{config} [{nome}]: {exc}", file=sys.stderr)
             falhas += 1
 
-    print(f"{Path(config).name}: {ok} convertidos, {falhas} falhas")
+    print(f"{Path(config).name}: {ok} converted, {falhas} failed")
     return 1 if falhas else 0
 
 
 def descobrir(pasta):
-    """Imprime uma configuração .ini a partir dos .gpkg e .qml de uma pasta."""
+    """Print an .ini configuration from the .gpkg and .qml files in a folder."""
     pasta = Path(pasta)
-    print(f"# gerado por: qml2lyrx --descobrir {pasta}")
-    print("# uma secção por camada; o nome da secção é o nome no ArcGIS Pro")
+    print(f"# generated by: qml2lyrx --descobrir {pasta}")
+    print("# one section per layer; the section name is the layer name in ArcGIS Pro")
     for gpkg in sorted(pasta.rglob("*.gpkg")):
         for nome, tabela in estilos_do_gpkg(gpkg):
             print(f"\n[{nome}]")
-            print(f"estilo = {gpkg}#{nome}")
-            print(f"camada = {tabela}")
-            print(f"saida  = {nome}.lyrx")
+            print(f"style = {gpkg}#{nome}")
+            print(f"layer = {tabela}")
+            print(f"output = {nome}.lyrx")
     for qml in sorted(pasta.rglob("*.qml")):
         print(f"\n[{qml.stem}]")
-        print(f"estilo = {qml}")
+        print(f"style = {qml}")
     return 0
 
 
 def tabela_ou_origem(gpkg, tabela):
-    """(tabela, nome_da_vista): se `tabela` for uma vista, devolve a tabela de baixo.
+    """(table, view_name): when `tabela` is a view, return the table underneath.
 
-    O GeoPackage do COS guarda os estilos em vistas (v_cos2025v1_n4). O ArcGIS
-    Pro pode não listar vistas, por isso a configuração aponta para a tabela
-    real e deixa a vista como alternativa comentada.
+    The COS GeoPackage stores its styles on views (v_cos2025v1_n4). ArcGIS Pro
+    may not list views, so the configuration points at the real table and keeps
+    the view as a commented-out alternative.
     """
     con = sqlite3.connect(f"file:{Path(gpkg).as_posix()}?mode=ro", uri=True)
     try:
@@ -526,17 +530,17 @@ def tabela_ou_origem(gpkg, tabela):
 
 
 def pasta_ferramenta():
-    """A pasta onde está o programa (a raiz do repo) — funciona também no .exe."""
+    """The folder holding the program (the repo root) — also works in the .exe."""
     if getattr(sys, "frozen", False):
         return Path(sys.executable).resolve().parent
     return Path(__file__).resolve().parent
 
 
 def extrair_gpkg(caminho):
-    """Extrai os .gpkg de um zip para uma pasta com o nome do zip (só uma vez).
+    """Extract the .gpkg files from a zip into a folder named after the zip (once).
 
-    O ArcGIS Pro não lê dentro de zips: para o .lyrx apontar para dados que
-    existam, o GeoPackage tem de ficar em disco.
+    ArcGIS Pro cannot read inside a zip: for the .lyrx to point at data that
+    exists, the GeoPackage has to live on disk.
     """
     destino = Path(caminho).with_suffix("")
     achados = []
@@ -548,7 +552,7 @@ def extrair_gpkg(caminho):
             alvo = destino / Path(membro).name
             if not alvo.exists():
                 alvo.parent.mkdir(parents=True, exist_ok=True)
-                print(f"a extrair {Path(caminho).name} -> {alvo.name} (pode demorar)",
+                print(f"extracting {Path(caminho).name} -> {alvo.name} (may take a while)",
                       file=sys.stderr)
                 with z.open(membro) as origem, open(alvo, "wb") as saida:
                     shutil.copyfileobj(origem, saida, 1024 * 1024)
@@ -557,7 +561,7 @@ def extrair_gpkg(caminho):
 
 
 def descobrir_entradas(pasta):
-    """Percorre a pasta (e os zips) e devolve uma entrada por estilo encontrado."""
+    """Walk the folder (and its zips) and return one entry per style found."""
     pasta = Path(pasta)
     entradas, usados = [], set()
 
@@ -566,12 +570,12 @@ def descobrir_entradas(pasta):
         try:
             gpkgs += extrair_gpkg(z)
         except (zipfile.BadZipFile, OSError) as exc:
-            print(f"aviso: {z.name}: não consigo abrir ({exc})", file=sys.stderr)
+            print(f"warning: {z.name}: cannot open ({exc})", file=sys.stderr)
 
     vistos_gpkg = set()
     for gpkg in gpkgs:
         gpkg = Path(gpkg).resolve()
-        if gpkg in vistos_gpkg:      # o mesmo gpkg pode vir do zip e do rglob
+        if gpkg in vistos_gpkg:      # the same gpkg can come from the zip and from rglob
             continue
         vistos_gpkg.add(gpkg)
 
@@ -579,11 +583,11 @@ def descobrir_entradas(pasta):
             try:
                 qml = estilo_do_gpkg(gpkg, estilo)
             except SystemExit as exc:
-                print(f"aviso: {exc}", file=sys.stderr)
+                print(f"warning: {exc}", file=sys.stderr)
                 continue
             if "<renderer-v2" not in qml:
-                print(f"aviso: '{estilo}' ({gpkg.name}) é um estilo de símbolo, "
-                      "não de camada — ignorado", file=sys.stderr)
+                print(f"warning: '{estilo}' ({gpkg.name}) is a symbol style, not a "
+                      "layer style — skipped", file=sys.stderr)
                 continue
 
             camada, vista = tabela_ou_origem(gpkg, tabela)
@@ -593,7 +597,7 @@ def descobrir_entradas(pasta):
                 secao = f"{secao}_2"
             usados.add(secao)
 
-            # os .lyrx vão para out/<nome-do-gpkg>_<data>/ na raiz do repo
+            # .lyrx files go to out/<gpkg-name>_<date>/ at the repo root
             saida = (pasta_ferramenta() / "out" /
                      f"{gpkg.stem}_{date.today().isoformat()}" / f"{estilo}.lyrx")
 
@@ -608,67 +612,67 @@ def descobrir_entradas(pasta):
 
 
 def escrever_config(caminho, entradas, pasta):
-    """Grava o converter.ini, com caminhos relativos à pasta."""
+    """Write converter.ini, with paths relative to the folder."""
     pasta = Path(pasta)
     linhas = [
-        "# qml2lyrx - gerado automaticamente a partir dos .gpkg desta pasta.",
-        "# Podes editar: enquanto este ficheiro existir, o programa usa-o tal como",
-        "# está (--forcar refaz a descoberta e substitui).",
+        "# qml2lyrx - generated from the .gpkg files in this folder.",
+        "# You can edit this file: while it exists the program uses it as it is",
+        "# (--force rebuilds the discovery and replaces it).",
         "#",
-        "# Uma secção por camada; o nome da secção é o nome da camada no Pro.",
+        "# One section per layer; the section name is the layer name in Pro.",
         "",
     ]
     for e in entradas:
         gpkg, estilo = e["estilo"]
         linhas.append(f"[{e['secao']}]")
-        linhas.append(f"estilo = {gpkg.relative_to(pasta)}#{estilo}")
+        linhas.append(f"style = {gpkg.relative_to(pasta)}#{estilo}")
         if e["alternativa"]:
-            linhas.append(f"# vista {e['alternativa']} (mais leve, se o Pro a abrir):")
-            linhas.append(f"# camada = {e['alternativa']}")
-        linhas.append(f"camada = {e['camada']}")
-        linhas.append(f"saida = {os.path.relpath(e['saida'], pasta)}")
+            linhas.append(f"# view {e['alternativa']} (lighter, if Pro can open it):")
+            linhas.append(f"# layer = {e['alternativa']}")
+        linhas.append(f"layer = {e['camada']}")
+        linhas.append(f"output = {os.path.relpath(e['saida'], pasta)}")
         linhas.append("")
 
     Path(caminho).write_text("\n".join(linhas), encoding="utf-8")
 
 
 def modo_pasta(pasta, forcar=False):
-    """Varre uma pasta: descobre estilos, escreve o converter.ini e converte."""
+    """Scan a folder: discover styles, write converter.ini and convert."""
     pasta = Path(pasta).expanduser().resolve()
     if not pasta.is_dir():
-        raise SystemExit(f"não encontro a pasta {pasta}")
+        raise SystemExit(f"folder not found: {pasta}")
 
     config = pasta / "converter.ini"
     if config.exists() and not forcar:
-        print(f"{config.name} já existe — a usar esse (--forcar para refazer)")
+        print(f"{config.name} already exists — using it (--force to rebuild)")
     else:
         entradas = descobrir_entradas(pasta)
         if not entradas:
-            raise SystemExit(f"não encontrei estilos em GeoPackages dentro de {pasta}")
+            raise SystemExit(f"no styles found in the GeoPackages inside {pasta}")
         escrever_config(config, entradas, pasta)
-        print(f"escrevi {config.name}: {len(entradas)} camadas encontradas")
+        print(f"wrote {config.name}: {_n(len(entradas), 'layer')} found")
 
     return lote(config)
 
 
 def main(argv=None):
     p = argparse.ArgumentParser(
-        description="Converte um estilo QML do QGIS num .lyrx do ArcGIS Pro.")
-    p.add_argument("entrada", nargs="?",
-                   help=".qml, 'dados.gpkg#Estilo', ou um .ini de configuração")
-    p.add_argument("saida", nargs="?", help=".lyrx a escrever (só no modo de um ficheiro)")
-    p.add_argument("-n", "--name", help="nome da camada (por omissão: nome do .lyrx)")
-    p.add_argument("-s", "--source", help="GeoPackage ou FileGDB de origem")
-    p.add_argument("-d", "--dataset", help="tabela / feature class")
-    p.add_argument("-c", "--campo",
-                   help="nome do campo no destino, se diferir do QML "
-                        "(shapefiles cortam aos 10 caracteres)")
-    p.add_argument("--descobrir", metavar="PASTA",
-                   help="lista estilos e dados de uma pasta e imprime uma configuração")
-    p.add_argument("--pasta", metavar="PASTA",
-                   help="varre a pasta, escreve o converter.ini e converte tudo")
-    p.add_argument("--forcar", action="store_true",
-                   help="com --pasta, refaz o converter.ini mesmo que já exista")
+        description="Convert a QGIS layer style (QML) into an ArcGIS Pro layer file (LYRX) or style (STYLX).")
+    p.add_argument("input", nargs="?",
+                   help=".qml, 'data.gpkg#StyleName', or an .ini configuration file")
+    p.add_argument("output", nargs="?", help=".lyrx or .stylx to write (single-file mode)")
+    p.add_argument("-n", "--name", help="layer name (default: the output file name)")
+    p.add_argument("-s", "--source", help="source GeoPackage or FileGDB")
+    p.add_argument("-d", "--dataset", help="table / feature class")
+    p.add_argument("-c", "--field", "--campo", dest="field",
+                   help="field name in the destination when it differs from the QML "
+                        "(shapefiles truncate to 10 characters)")
+    p.add_argument("--discover", "--descobrir", dest="descobrir", metavar="FOLDER",
+                   help="list the styles and data in a folder and print a configuration")
+    p.add_argument("--folder", "--pasta", dest="pasta", metavar="FOLDER",
+                   help="scan the folder, write converter.ini and convert everything")
+    p.add_argument("--force", "--forcar", dest="forcar", action="store_true",
+                   help="with --folder, rebuild converter.ini even if it exists")
     p.add_argument("--version", action="version", version=f"qml2lyrx {VERSAO}")
     a = p.parse_args(argv)
 
@@ -676,18 +680,18 @@ def main(argv=None):
         return descobrir(a.descobrir)
     if a.pasta:
         return modo_pasta(a.pasta, a.forcar)
-    if not a.entrada:
-        p.error("indica um .qml, um 'gpkg#Estilo' ou um .txt de configuração")
-    if Path(a.entrada).suffix.lower() in (".txt", ".cfg", ".ini"):
-        return lote(a.entrada)
-    if not a.saida:
-        p.error("falta o .lyrx de saída")
+    if not a.input:
+        p.error("give a .qml, a 'gpkg#StyleName' or an .ini configuration file")
+    if Path(a.input).suffix.lower() in (".txt", ".cfg", ".ini"):
+        return lote(a.input)
+    if not a.output:
+        p.error("missing the output .lyrx")
 
-    if Path(a.saida).suffix.lower() == ".stylx":
-        escrever_stylx(a.entrada, a.saida, a.name)
+    if Path(a.output).suffix.lower() == ".stylx":
+        escrever_stylx(a.input, a.output, a.name)
         return 0
 
-    converter(a.entrada, a.saida, a.source, a.dataset, a.name, a.campo)
+    converter(a.input, a.output, a.source, a.dataset, a.name, a.field)
     return 0
 
 

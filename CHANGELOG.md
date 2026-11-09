@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.1.1 - 2026-11-09
+
+### Changed
+
+- Command-line messages, `--help`, warnings and errors are now in English.
+- `converter.ini` keys renamed to `style`, `data`, `layer` and `output`.
+- Flags renamed to `--folder`, `--force`, `--discover` and `--field`; the
+  Portuguese spellings (`--pasta`, `--forcar`, `--descobrir`, `--campo`) still
+  work as aliases.
+- `correr.bat` and `construir-exe.bat` messages in English.
+
+### Fixed
+
+- The two-column example in the README collapsed on GitHub; it is now two
+  separate code blocks.
+
 ## 0.1.0 - 2026-11-09
 
 ### Added

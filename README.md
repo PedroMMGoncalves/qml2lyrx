@@ -32,12 +32,24 @@ The reference case is the Portuguese **COS25v1** land cover style: 102 rules on
 
 ## How it works
 
-A `.qml` is XML, a `.lyrx` is JSON. The program is the bridge between them:
+A `.qml` is XML, a `.lyrx` is JSON. The program is the bridge between them.
 
+In the QML, a rule points at a symbol, and the symbol holds the colour:
+
+```xml
+<rule filter=""campo = '1.1.1.1'"" symbol="0"/>
+<symbol name="0">
+  <Option name="color" value="230,0,77,255"/>
 ```
-QML                                              .lyrx
-<rule filter=""campo = '1.1.1.1'"" symbol="0"/>       {"label": "...", "values": ["1.1.1.1"],
-<Option name="color" value="230,0,77,255"/>            "symbol": {"color": [230, 0, 77, 100]}}
+
+In the `.lyrx`, the same information becomes one class of a unique-values renderer:
+
+```json
+{
+  "label": "1.1.1.1 Áreas edificadas…",
+  "values": [{ "fieldValues": ["1.1.1.1"] }],
+  "symbol": { "symbolLayers": [{ "color": { "values": [230, 0, 77, 100] } }] }
+}
 ```
 
 | function | what it does |
@@ -102,14 +114,16 @@ inside a zip, so the `.lyrx` must point at a file on disk.
 ## Command line
 
 ```bash
-python qml2lyrx.py --pasta "C:\data"            # scan, write converter.ini, convert
-python qml2lyrx.py --pasta "C:\data" --forcar   # rebuild converter.ini
+python qml2lyrx.py --folder "C:\data"           # scan, write converter.ini, convert
+python qml2lyrx.py --folder "C:\data" --force   # rebuild converter.ini
 python qml2lyrx.py estilo.qml out.lyrx -s dados.gpkg -d camada
 python qml2lyrx.py "dados.gpkg#COS25v1_n4" out.lyrx -d camada
 python qml2lyrx.py "dados.gpkg#COS25v1_n4" out_COS25v1_n4.stylx   # style only
 ```
 
-`-c/--campo` overrides the field name when the destination uses another one.
+`-c/--field` overrides the field name when the destination uses another one.
+The Portuguese spellings (`--pasta`, `--forcar`, `--descobrir`, `--campo`) still
+work.
 
 ## The `converter.ini`
 
@@ -117,12 +131,12 @@ One section per layer; the section name is the layer name in Pro:
 
 ```ini
 [COS25v1_N4]
-estilo = geopackages/cos2025v1.gpkg#COS25v1_n4
-camada = cos2025v1
-saida  = out/cos2025v1_2026-11-09/COS25v1_n4.lyrx
+style  = geopackages/cos2025v1.gpkg#COS25v1_n4
+layer  = cos2025v1
+output = out/cos2025v1_2026-11-09/COS25v1_n4.lyrx
 ```
 
-`dados` is optional (defaults to the GeoPackage the style came from) and paths
+`data` is optional (defaults to the GeoPackage the style came from) and paths
 are relative to the `.ini`. If a style is stored on a GeoPackage **view**, the
 configuration points at the real table — Pro may not list views — and leaves the
 view as a commented line.
