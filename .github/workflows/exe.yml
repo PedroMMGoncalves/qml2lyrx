@@ -1,0 +1,37 @@
+name: exe
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ["v*"]
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Testes
+        run: python -m unittest test_qml2lyrx -v
+
+      - name: Instalar PyInstaller
+        run: python -m pip install --upgrade pyinstaller
+
+      - name: Construir
+        run: python -m PyInstaller --onefile --name qml2lyrx qml2lyrx.py
+
+      - name: Testar o executável
+        shell: cmd
+        run: |
+          dist\qml2lyrx.exe --version
+          dist\qml2lyrx.exe exemplo.qml teste.lyrx
+          if not exist teste.lyrx exit /b 1
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: qml2lyrx-windows
+          path: dist/qml2lyrx.exe

@@ -1,0 +1,22 @@
+cff-version: 1.2.0
+title: qml2lyrx
+message: "If you use this software, please cite the version used in your analysis."
+type: software
+authors:
+  - family-names: Goncalves
+    given-names: Pedro
+version: 0.1.0
+date-released: 2026-11-09
+license: MIT
+repository-code: "https://github.com/PedroMMGoncalves/qml2lyrx"
+abstract: "Convert QGIS layer styles (.qml) into ArcGIS Pro layer files (.lyrx) and styles (.stylx)."
+keywords:
+  - QGIS
+  - ArcGIS Pro
+  - QML
+  - LYRX
+  - CIM
+  - symbology
+  - cartography
+  - land cover
+  - COS

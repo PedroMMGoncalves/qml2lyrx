@@ -1,0 +1,28 @@
+# Changelog
+
+## 0.1.0 - 2026-11-09
+
+### Added
+
+- `qml2lyrx.py`: converts QGIS `singleSymbol`, `categorizedSymbol` and
+  `RuleRenderer` (equality rules) into ArcGIS Pro layer files.
+- `--pasta` mode: scans a folder, reads the styles stored in the GeoPackages
+  (`layer_styles`), writes a `converter.ini` and converts everything.
+- Zipped GeoPackages: a `.zip` is extracted once, next to the file.
+- `.stylx` output: the same symbols written as an ArcGIS Pro style, one per
+  class, under a category named after the layer.
+- `*_shapefile.lyrx` twin: every layer whose field name exceeds 10 characters
+  also gets a variant with the truncated name, for shapefile targets.
+- `--campo` to override the field name explicitly.
+- `correr.bat` and `construir-exe.bat` for double-click use and for building a
+  standalone `.exe` (also built by `.github/workflows/exe.yml`).
+
+### Notes
+
+- `.lyrx` structure validated against 107 layer files shipped with ArcGIS Pro
+  3.7; the class table was diffed against the QGIS style stored in the COS25v1
+  GeoPackage.
+- The `.stylx` layout was copied from a style installed by ArcGIS Pro but has
+  not been opened in Pro during development.
+- Point symbols, graduated renderers and non-equality filters are refused with
+  an explicit message.
