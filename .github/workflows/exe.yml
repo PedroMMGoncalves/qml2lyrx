@@ -1,4 +1,4 @@
-name: exe
+﻿name: exe
 
 on:
   workflow_dispatch:
@@ -9,9 +9,9 @@ jobs:
   windows:
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-python@v6
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
 
@@ -24,14 +24,14 @@ jobs:
       - name: Construir
         run: python -m PyInstaller --onefile --name qml2lyrx qml2lyrx.py
 
-      - name: Testar o executável
+      - name: Testar o executÃ¡vel
         shell: cmd
         run: |
           dist\qml2lyrx.exe --version
           dist\qml2lyrx.exe exemplo.qml teste.lyrx
           if not exist teste.lyrx exit /b 1
 
-      - uses: actions/upload-artifact@v5
+      - uses: actions/upload-artifact@v7
         with:
           name: qml2lyrx-windows
           path: dist/qml2lyrx.exe
