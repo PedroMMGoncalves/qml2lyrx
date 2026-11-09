@@ -16,7 +16,7 @@
   <img src="https://img.shields.io/badge/status-beta-orange" alt="Beta">
 </p>
 
-> **Version:** 0.1.1
+> **Version:** 0.1.2
 > **Requires:** Python 3.9+ or the standalone `.exe` · ArcGIS Pro 3.x
 
 ## Overview
@@ -152,6 +152,25 @@ are relative to the `.ini`. If a style is stored on a GeoPackage **view**, the
 configuration points at the real table — Pro may not list views — and leaves the
 view as a commented line.
 
+## Styles (`.stylx`)
+
+Every conversion also writes an ArcGIS Pro style with the same symbols, one per
+class. A `.stylx` is a **symbol palette, not a classification**: it does not know
+about the field, so it is meant for picking symbols by hand or for carrying the
+palette into other projects.
+
+To open one:
+
+1. **Insert** tab → **Styles** → **Add** → **Add Style** (or **Project** →
+   **Styles** → **Add Style**) and pick the `.stylx`. Nothing appears on the map;
+   the style becomes available in the project.
+2. Open the **Symbology** pane, open the style selector at the top of the symbol
+   gallery and choose the style — it is listed under the layer name.
+3. Select one or more classes and click a symbol, or drag a symbol onto a class.
+
+The `.lyrx` remains the one-step route: it already carries the unique-values
+renderer with all the classes.
+
 ## Installation
 
 ```bash
@@ -205,9 +224,8 @@ qml2lyrx/
   GeoPackage: 101 codes, 101 labels, 101 colours, no differences.
 - `python -m unittest test_qml2lyrx` covers the real COS25v1 style, a synthetic
   GeoPackage, a zip, and the `.stylx` writer.
-
-The `.stylx` layout was copied from a style installed by ArcGIS Pro, but unlike
-the `.lyrx` it has **not** been opened in Pro during development.
+- The `.stylx` was opened in ArcGIS Pro 3.x: the style is listed under
+  **Catalog → Styles** and its symbols are consumed from the Symbology pane.
 
 ## Limitations
 

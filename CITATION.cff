@@ -5,7 +5,7 @@ type: software
 authors:
   - family-names: Goncalves
     given-names: Pedro
-version: 0.1.1
+version: 0.1.2
 date-released: 2026-11-09
 license: GPL-3.0
 repository-code: "https://github.com/PedroMMGoncalves/qml2lyrx"

@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.1.2 - 2026-11-09
+
+### Changed
+
+- GitHub Actions moved to `checkout@v5`, `setup-python@v6` and
+  `upload-artifact@v5`; the previous majors run on the deprecated Node 20.
+
+### Validated
+
+- The `.stylx` output was opened in ArcGIS Pro 3.x: the style is listed under
+  **Catalog → Styles** and its symbols are applied from the Symbology pane. The
+  caveat that said otherwise is gone from the README.
+
+### Documentation
+
+- New README section on opening a `.stylx` in ArcGIS Pro.
+
 ## 0.1.1 - 2026-11-09
 
 ### Changed

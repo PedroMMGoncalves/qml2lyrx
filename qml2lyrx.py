@@ -28,7 +28,7 @@ from pathlib import Path
 # CIM measures widths in points; QGIS in mm / pixel / inch
 UNIDADES = {"MM": 2.834645669, "Pixel": 0.75, "Point": 1.0, "Inch": 72.0}
 
-VERSAO = "0.1.1"
+VERSAO = "0.1.2"
 
 
 def _n(count, word, suffix="s"):

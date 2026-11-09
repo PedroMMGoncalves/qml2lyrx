@@ -9,9 +9,9 @@ jobs:
   windows:
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
 
@@ -31,7 +31,7 @@ jobs:
           dist\qml2lyrx.exe exemplo.qml teste.lyrx
           if not exist teste.lyrx exit /b 1
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v5
         with:
           name: qml2lyrx-windows
           path: dist/qml2lyrx.exe
