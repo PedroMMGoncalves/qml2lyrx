@@ -88,19 +88,28 @@ Fidelity notes:
 
 ## Quick start (no command line)
 
-Copy `qml2lyrx.exe` (or `qml2lyrx.py`) and `correr.bat` next to the data, or
-drop a folder or a `.zip` on top of `correr.bat`. It scans the folder, reads the
-styles stored in the GeoPackages, writes a `converter.ini` and converts
-everything:
+The repository ships two empty folders for this:
+
+| folder | purpose |
+|---|---|
+| **`geopackages/`** | drop the `.gpkg` files — or `.zip` archives — you want to convert |
+| **`out/`** | results go here, one folder per GeoPackage per day |
+
+Both are ignored by git: only the README inside each one is tracked, so data
+never reaches the repository.
+
+With files in `geopackages/`, a double-click on `correr.bat` is all it takes. It
+scans the folder, reads the styles stored in the GeoPackages, writes a
+`converter.ini` and converts everything:
 
 ```
-data/
+qml2lyrx/
 ├── correr.bat
 ├── qml2lyrx.exe
-├── geopackages/            ← drop .gpkg or .zip here (git-ignored)
+├── geopackages/            <- drop .gpkg or .zip here (git-ignored)
 │   ├── cos2025v1.gpkg
-│   └── converter.ini       ← generated, editable
-└── out/
+│   └── converter.ini       <- generated, editable
+└── out/                    <- results (git-ignored)
     └── cos2025v1_2026-11-09/
         ├── COS25v1_n4.lyrx            layer with symbology
         ├── COS25v1_n4.stylx           101 symbols as a style
@@ -108,8 +117,10 @@ data/
         └── ...
 ```
 
-Zipped GeoPackages are extracted once, next to the zip — ArcGIS Pro cannot read
-inside a zip, so the `.lyrx` must point at a file on disk.
+The same conversion runs on any other folder too — drop it onto `correr.bat`, or
+point the command line at it with `--folder`. Zipped GeoPackages are extracted
+once, next to the zip: ArcGIS Pro cannot read inside a zip, so the `.lyrx` must
+point at a file on disk.
 
 ## Command line
 
@@ -168,6 +179,10 @@ qml2lyrx/
 ├── construir-exe.bat
 ├── exemplo.qml
 ├── test_qml2lyrx.py
+├── geopackages/           data drop zone (git-ignored, README tracked)
+│   └── README.md
+├── out/                   results (git-ignored, README tracked)
+│   └── README.md
 ├── assets/
 │   └── logo.png
 ├── .github/

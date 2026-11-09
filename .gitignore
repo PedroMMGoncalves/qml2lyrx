@@ -4,14 +4,16 @@ dist/
 *.spec
 *.exe
 
-# saídas do conversor
-out/
+# Outputs: generated on every run. The folder ships with a README only.
+out/*
+!out/README.md
 _lyrx/
 *.lyrx
 teste.lyrx
 
-# dados que o utilizador põe aqui para converter (nunca vão para o git)
-geopackages/
+# Data drop zone: never committed. The folder ships with a README only.
+geopackages/*
+!geopackages/README.md
 
 # Python
 __pycache__/
@@ -20,7 +22,7 @@ __pycache__/
 .venv/
 venv/
 
-# Ferramentas / sistema
+# Tools / system
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
