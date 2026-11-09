@@ -12,7 +12,7 @@
   <img src="https://img.shields.io/badge/QGIS-3.x-589632?logo=qgis&logoColor=white" alt="QGIS 3.x">
   <img src="https://img.shields.io/badge/ArcGIS%20Pro-3.x-0079C1" alt="ArcGIS Pro 3.x">
   <img src="https://img.shields.io/badge/Python-3.9%2B-3776AB?logo=python&logoColor=white" alt="Python 3.9+">
-  <img src="https://img.shields.io/badge/license-MIT-blue" alt="MIT">
+  <img src="https://img.shields.io/badge/license-GPL--3.0-blue" alt="GPL-3.0">
   <img src="https://img.shields.io/badge/status-beta-orange" alt="Beta">
 </p>
 
@@ -195,7 +195,7 @@ Machine-readable citation metadata are available in `CITATION.cff`.
 
 ## License
 
-Released under the **MIT License**.
+Released under the **GNU General Public License v3.0**.
 
 ## Author
 

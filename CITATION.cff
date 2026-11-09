@@ -7,7 +7,7 @@ authors:
     given-names: Pedro
 version: 0.1.0
 date-released: 2026-11-09
-license: MIT
+license: GPL-3.0
 repository-code: "https://github.com/PedroMMGoncalves/qml2lyrx"
 abstract: "Convert QGIS layer styles (.qml) into ArcGIS Pro layer files (.lyrx) and styles (.stylx)."
 keywords:
