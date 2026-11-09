@@ -133,20 +133,21 @@ class TestModoPasta(unittest.TestCase):
         self.assertEqual(codigo, 0)
 
         config = (self.pasta / "converter.ini").read_text(encoding="utf-8")
-        self.assertIn("camada = parcelas", config)          # a vista foi resolvida
-        self.assertIn("# camada = v_parcelas", config)      # e a alternativa ficou em comentário
+        self.assertIn("layer = parcelas", config)          # the view was resolved
+        self.assertIn("# layer = v_parcelas", config)      # and the alternative is commented
         self.assertTrue(self._saida("x", "n4").exists())
         # a cada .lyrx sai também o .stylx
         self.assertTrue(self._saida("x", "n4").with_suffix(".stylx").exists())
 
     def test_nao_refaz_o_config_existente(self):
         (self.pasta / "converter.ini").write_text(
-            "[n4]\nestilo = dados/x.gpkg#n4\ncamada = parcelas\nsaida = out/n4.lyrx\n",
+            "[n4]\nstyle = dados/x.gpkg#n4\nlayer = parcelas\noutput = out/n4.lyrx\n",
             encoding="utf-8",
         )
         codigo = qml2lyrx.main(["--pasta", str(self.pasta)])
         self.assertEqual(codigo, 0)
-        self.assertNotIn("# gerado", (self.pasta / "converter.ini").read_text(encoding="utf-8"))
+        self.assertNotIn("# qml2lyrx - generated",
+                         (self.pasta / "converter.ini").read_text(encoding="utf-8"))
 
 
 class TestZip(unittest.TestCase):
