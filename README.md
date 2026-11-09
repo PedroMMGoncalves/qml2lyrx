@@ -16,7 +16,7 @@
   <img src="https://img.shields.io/badge/status-beta-orange" alt="Beta">
 </p>
 
-> **Version:** 0.1.0
+> **Version:** 0.1.1
 > **Requires:** Python 3.9+ or the standalone `.exe` · ArcGIS Pro 3.x
 
 ## Overview
